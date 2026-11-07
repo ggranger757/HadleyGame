@@ -10,3 +10,10 @@
 
 ## Ideas for next
 - Voice acting for key lines; more Daily Case scenarios; Case 02 · The Scientist.
+
+## v3.0 — CHRONOMANCER
+- New story: a killer across 2026, 1986, 1947 and 1888 with fixed-timeline time travel; 6 chapters, 50 dialogues, 33 clues, history and knowledge checks, 12 puzzle types.
+- Characters rebuilt on the owner's base templates (tools/dress.py); shorter characters use the mini template; Bernard redone as Ritual-style cosmic horror.
+- Real-time combat with hero kits (Augie's staff heads with swap animation, drum rounds and Golems; Jester's shotgun, crew rush and the mask).
+- Original synthesized soundtrack (17 tracks); rural-noir and neo-noir painted backgrounds; era looks; time-jump cinematic.
+- Raincaster Run car chase (story and arcade); neon cyberpunk UI in Courier.

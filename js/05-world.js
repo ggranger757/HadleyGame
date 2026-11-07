@@ -32,9 +32,9 @@ TM.In = (() => {
 
 TM.W = (() => {
   const U = TM.U, P = TM.PAL || {};
-  const GROUND = { c1: 214, c3: 224, c4: 232, lab: 218, ind: 292, bulk: 184, cold: 198, miami: 193, b4: 232, s4n: 250 };
-  const TINT = { night: 'rgba(4,6,30,.62)', dark: 'rgba(0,0,0,.55)', neon: 'rgba(28,0,40,.32)', club: 'rgba(38,0,48,.5)', lab: 'rgba(0,18,30,.35)', ritual: 'rgba(48,0,32,.55)', dawn: null };
-  let cv, ctx, lc, lx, W = 480, H = 270, imgs = {}, rain = [];
+  const GROUND = { c1: 214, c3: 224, c4: 232, lab: 218, ind: 292, bulk: 184, cold: 198, miami: 193, b4: 232, s4n: 250, c2: 220, pine: 268, nfa: 208, gothic: 206, pfor: 234, skyline: 306, neoncity: 206, a3: 308, rn_town86: 230, rn_town47: 230, rn_town88: 230, rn_fields: 230, nn_city: 230, nn_alley: 230 };
+  const TINT = { night: 'rgba(4,6,30,.45)', dark: 'rgba(0,0,0,.55)', neon: 'rgba(28,0,40,.22)', club: 'rgba(38,0,48,.45)', lab: 'rgba(0,18,30,.35)', ritual: 'rgba(48,0,32,.55)', dawn: null, dusk: 'rgba(40,10,40,.25)', noir: 'rgba(0,0,0,.35)', snow: 'rgba(10,16,40,.3)', snowdark: 'rgba(4,8,24,.5)', candle: 'rgba(30,14,0,.5)', between: 'rgba(20,0,40,.5)' };
+  let cv, ctx, lc, lx, W = 480, H = 270, imgs = {}, rain = [], snow = [];
   const w = { scene: null, sc: null, cam: 0, t: 0, p: null, fx: [], things: [], battle: null };
 
   function img(src) { if (!imgs[src]) { const i = new Image(); i.src = src; imgs[src] = i; } return imgs[src]; }
@@ -47,6 +47,7 @@ TM.W = (() => {
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; lc.width = W; lc.height = H; ctx.imageSmoothingEnabled = false; }
     const s = Math.min(r.width / W, r.height / H); cv.style.width = Math.round(W * s) + 'px'; cv.style.height = Math.round(H * s) + 'px';
     rain = Array.from({ length: Math.round(W / 4) }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 200 + Math.random() * 140 }));
+    snow = Array.from({ length: Math.round(W / 3) }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 18 + Math.random() * 30, w: Math.random() * 6, z: Math.random() < .3 ? 2 : 1 }));
   }
 
   /* ---------------- sprites ---------------- */
@@ -55,17 +56,21 @@ TM.W = (() => {
   function drawSpr(id, anim, t, x, ground, dir, o = {}) {
     if (id === 'PARTNER') id = partnerSpr();
     const m = TM.SPR[id]; if (!m) return; const a = m.anims[anim] || m.anims.idle; const im = img('assets/sprites/' + id + '.png'); if (!im.complete) return;
-    const f = o.frame != null ? Math.min(o.frame, a.n - 1) : Math.floor(t * (anim === 'walk' ? 10 : 7)) % a.n;
+    const f = o.frame != null ? Math.min(o.frame, a.n - 1) : Math.floor(t * (anim === 'walk' ? 9 : anim === 'idle' ? 5 : 8)) % a.n;
     const s = (m.scale || 1) * (o.scale || 1); const fw = m.fw, fh = m.fh;
     const feet = (a.b[1] + a.b[3]);
     const dx = Math.round(x - fw * s / 2), dy = Math.round(ground - feet * s);
     const flip = (m.face === 'left') ? dir > 0 : dir < 0;
     ctx.save(); if (o.alpha != null) ctx.globalAlpha = o.alpha; if (o.flash) ctx.filter = 'brightness(3)';
+    if (o.shadow) { ctx.filter = 'brightness(0)'; ctx.globalAlpha = .85 + .15 * Math.sin(t * 13); }
     if (flip) { ctx.translate(dx + fw * s, dy); ctx.scale(-1, 1); ctx.drawImage(im, f * fw, a.r * fh, fw, fh, 0, 0, fw * s, fh * s); }
     else ctx.drawImage(im, f * fw, a.r * fh, fw, fh, dx, dy, fw * s, fh * s);
     ctx.restore();
-    return { top: dy + a.b[1] * s, h: a.b[3] * s };
+    if (o.shadow) { ctx.save(); ctx.globalAlpha = .5; ctx.fillStyle = '#ff4fd8'; for (let i = 0; i < 4; i++) ctx.fillRect(dx + fw * s * (.3 + Math.random() * .4), dy + a.b[1] * s + Math.random() * a.b[3] * s, 2 + Math.random() * 6, 1); ctx.restore(); }
+    const an = a.an ? a.an[f] : null; const sx = flip ? -1 : 1;
+    return { top: dy + a.b[1] * s, h: a.b[3] * s, x: dx, y: dy, s, an: an && flip ? flipAn(an, fw) : an };
   }
+  function flipAn(an, fw) { const o = {}; for (const k in an) { const v = an[k]; o[k] = v ? [fw - v[0], ...v.slice(1)] : v; } return o; }
   function sprTop(id) { if (id === 'PARTNER') id = partnerSpr(); const m = TM.SPR[id]; if (!m) return 50; const a = m.anims.idle; return a.b[3] * (m.scale || 1); }
 
   /* ---------------- scene ---------------- */
@@ -80,20 +85,21 @@ TM.W = (() => {
     w.cam = U.clamp(x - W / 2, 0, Math.max(0, sc.w - W));
     for (const t of w.things) if (t.type === 'cop') { t.cx = t.x; t.cdir = -1; t.wait = 0; }
     run.flags['seen_' + sceneId] = true;
-    TM.Audio.setRain(!!sc.rain);
+    TM.Audio.setRain(!!sc.rain); TM.Audio.setMood(sceneMusic()); document.body.dataset.era = ch.era || '2026';
     sizeCanvas(); TM.S.saveRun(); TM.Game.checkSteps();
   }
+  function sceneMusic() { const sc = w.sc; return (sc && sc.music) || chapter().music; }
   const visible = (t) => {
     const run = TM.S.run;
     if (t.hidden && !run.flags[t.hidden]) return false;
+    if (t.gone && run.flags[t.gone]) return false;
     if (t.type === 'clue' && TM.S.has(t.clue)) return false;
     if (t.type === 'foe' && run.wins[t.fight]) return false;
     if (t.type === 'glyph' && run.glyphs[run.ch + ':' + t.key]) return false;
     if (t.type === 'med' && run.flags['med_' + run.ch + t.key]) return false;
     if (t.type === 'wall' && run.flags.wall_open) return false;
-    if (t.type === 'npc' && t.id === 'canister' && run.flags.canister) return false;
     if (t.type === 'puzzle' && run.flags['pz_' + t.puzzle]) return false;
-    if (t.id === 'rival' && run.flags.rival_done) return false;
+    if (t.type === 'chase' && run.flags[t.then && t.then.flag]) return false;
     return true;
   };
   function nearest() {
@@ -103,7 +109,7 @@ TM.W = (() => {
   }
   function label(t) {
     if (!t) return null; if (t.label) return t.label;
-    return { clue: 'LOOK', npc: 'TALK', door: 'GO', foe: 'FIGHT', puzzle: 'SOLVE', hide: w.p.hidden ? 'COME OUT' : 'HIDE', wall: 'TOUCH' }[t.type] || 'USE';
+    return { clue: 'LOOK', npc: 'TALK', door: 'GO', foe: 'FIGHT', puzzle: 'SOLVE', chase: 'DRIVE', hide: w.p.hidden ? 'COME OUT' : 'HIDE', wall: 'TOUCH' }[t.type] || 'USE';
   }
 
   /* ---------------- update ---------------- */
@@ -114,13 +120,13 @@ TM.W = (() => {
     if (TM.UI.blocking()) { p.walking = false; return; }
     const dirIn = (TM.In.held('right') ? 1 : 0) - (TM.In.held('left') ? 1 : 0);
     if (dirIn && p.hidden) { p.hidden = false; }
-    p.walking = !!dirIn; if (dirIn) { p.dir = dirIn; p.x = U.clamp(p.x + dirIn * 92 * dt, 14, sc.w - 14); p.step = (p.step || 0) - dt; if (p.step <= 0) { p.step = .34; TM.Audio.play('step', sc.rain ? 'wet' : 'tile'); } }
+    p.walking = !!dirIn; if (dirIn) { p.dir = dirIn; p.x = U.clamp(p.x + dirIn * 70 * dt, 14, sc.w - 14); p.step = (p.step || 0) - dt; if (p.step <= 0) { p.step = .4; TM.Audio.play('step', sc.rain ? 'wet' : 'tile'); } }
     const target = U.clamp(p.x - W / 2 + p.dir * 30, 0, Math.max(0, sc.w - W)); w.cam += (target - w.cam) * Math.min(1, dt * 5);
     // pickups
     const run = TM.S.run;
     for (const t of w.things) {
       if (!visible(t)) continue;
-      if (t.type === 'glyph' && Math.abs(t.x - p.x) < 16) { run.glyphs[run.ch + ':' + t.key] = 1; TM.Audio.play('spark'); burst(t.x, w.ground - t.y, '#ff2a8d', 14); TM.UI.toast('◆ Hidden glyph found! (' + glyphCount() + ')'); TM.S.xp(25, 'glyph'); const f = Object.keys(TM.FILES).find((k) => !TM.S.profile.files[k]); if (f) { TM.S.file(f); TM.UI.toast('📁 New file unlocked: ' + TM.FILES[f][0]); } TM.S.saveRun(); }
+      if (t.type === 'glyph' && Math.abs(t.x - p.x) < 16) { run.glyphs[run.ch + ':' + t.key] = 1; TM.Audio.play('spark'); burst(t.x, w.ground - t.y, '#ff4fd8', 14); TM.UI.toast('◆ A lost second (' + glyphCount() + ')'); TM.S.xp(25, 'glyph'); const f = Object.keys(TM.FILES).find((k) => !TM.S.profile.files[k]); if (f) { TM.S.file(f); TM.UI.toast('📁 New file unlocked: ' + TM.FILES[f][0]); } TM.S.saveRun(); }
       if (t.type === 'med' && Math.abs(t.x - p.x) < 16) { run.flags['med_' + run.ch + t.key] = 1; run.meds++; TM.Audio.play('heal'); TM.UI.toast('+1 MED KIT'); TM.S.saveRun(); }
     }
     // stealth guards
@@ -155,7 +161,7 @@ TM.W = (() => {
     if (t.type === 'door') { if (t.to === 'END') { run.flags.END = true; TM.Game.checkSteps(); return; } return TM.UI.fade(() => enter(t.to, w.scene)); }
     if (t.type === 'foe') return TM.Battle.start(t);
     if (t.type === 'hide') { w.p.hidden = !w.p.hidden; w.p.x = t.x; TM.Audio.play('ui'); return; }
-    if (t.type === 'wall') return TM.Puzzle.open('spot', () => TM.UI.talk('wall'));
+    if (t.type === 'chase') return TM.Chase.start(t.chase || 'tower', (ok) => { if (!ok) return; const th = t.then || {}; if (th.flag) run.flags[th.flag] = true; TM.Game.checkSteps(); TM.S.saveRun(); });
     if (t.type === 'puzzle') return TM.Puzzle.open(t.puzzle, () => { const th = t.then || {}; run.flags['pz_' + t.puzzle] = true; if (th.flag) run.flags[th.flag] = true; if (th.clue) TM.UI.clue(th.clue); else if (th.dlg) TM.UI.talk(th.dlg); TM.Game.checkSteps(); TM.S.saveRun(); });
   }
 
@@ -193,10 +199,11 @@ TM.W = (() => {
       if (!visible(th)) continue; const x = th.x;
       if (th.type === 'prop') drawProp(th.art, x, g, t);
       if (th.type === 'hide') { ctx.fillStyle = '#2a2d36'; ctx.fillRect(x - 14, g - 22, 28, 22); ctx.fillStyle = '#3a3e4a'; ctx.fillRect(x - 14, g - 22, 28, 3); }
-      if (th.type === 'wall') { ctx.fillStyle = 'rgba(90,96,110,.9)'; ctx.fillRect(x - 14, g - 70, 28, 70); ctx.fillStyle = `rgba(255,42,141,${.15 + .15 * Math.sin(t * 5)})`; ctx.fillRect(x - 14, g - 70, 28, 70); }
-      if (th.type === 'door') { const back = th.back; ctx.fillStyle = 'rgba(230,236,240,.85)'; ctx.font = '10px Silkscreen, monospace'; ctx.textAlign = 'center'; ctx.fillText(back ? '◀' : '▶', x, g - 30 + Math.sin(t * 4) * 2); ctx.fillStyle = 'rgba(230,236,240,.12)'; ctx.fillRect(x - 10, g - 54, 20, 54); }
-      if (th.type === 'glyph') { ctx.save(); ctx.globalAlpha = .45 + .25 * Math.sin(t * 3 + x); diamond(x, g - th.y + Math.sin(t * 2 + x) * 3, 4, '#ff2a8d'); ctx.restore(); }
+      if (th.type === 'wall') { ctx.fillStyle = 'rgba(90,96,110,.9)'; ctx.fillRect(x - 14, g - 70, 28, 70); ctx.fillStyle = `rgba(255,79,216,${.15 + .15 * Math.sin(t * 5)})`; ctx.fillRect(x - 14, g - 70, 28, 70); }
+      if (th.type === 'door') { const back = th.back; ctx.fillStyle = 'rgba(230,236,240,.85)'; ctx.font = 'bold 11px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.fillText(back ? '◀' : '▶', x, g - 30 + Math.sin(t * 4) * 2); ctx.fillStyle = 'rgba(230,236,240,.12)'; ctx.fillRect(x - 10, g - 54, 20, 54); }
+      if (th.type === 'glyph') { ctx.save(); ctx.globalAlpha = .45 + .25 * Math.sin(t * 3 + x); diamond(x, g - th.y + Math.sin(t * 2 + x) * 3, 4, '#ff4fd8'); ctx.restore(); }
       if (th.type === 'med') { ctx.fillStyle = '#e6ecf0'; ctx.fillRect(x - 6, g - 12, 12, 10); ctx.fillStyle = '#3aa07a'; ctx.fillRect(x - 1, g - 11, 2, 8); ctx.fillRect(x - 4, g - 8, 8, 2); }
+      if (th.type === 'chase') { drawProp('car:' + (th.car || 'hatch'), x, g, t); ctx.font = 'bold 9px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = `rgba(255,214,107,${.6 + .4 * Math.sin(t * 5)})`; ctx.fillText('▼', x, g - 40 + Math.sin(t * 4) * 2); }
       if (th.type === 'puzzle') { ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.fillText(th.icon || '🧩', x, g - 6 + Math.sin(t * 3) * 1.5); sparkle(x + 10, g - 30, 4, `rgba(255,214,107,${.6 + .4 * Math.sin(t * 5)})`); }
       if (th.type === 'clue') { const k = .6 + .4 * Math.sin(t * 5 + x); sparkle(x, g - 28 + Math.sin(t * 3) * 2, 5 + k * 2, `rgba(230,236,240,${.6 + .4 * k})`); }
     }
@@ -204,11 +211,11 @@ TM.W = (() => {
     for (const th of w.things) {
       if (!visible(th)) continue; const x = th.x;
       if (th.type === 'npc') { if (th.spr) drawSpr(th.spr, 'idle', t + x, x, g, p.x < x ? -1 : 1); else { ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.fillText(th.icon || '❔', x, g - 6); } }
-      if (th.type === 'foe') { const f = TM.FOES[th.foe]; drawSpr(f.spr, 'idle', t + x, x, g, p.x < x ? -1 : 1); if (th.foe !== 'grunt' && th.foe !== 'bernard') { ctx.save(); ctx.globalAlpha = .6 + .4 * Math.sin(t * 6); diamond(x, g - sprTop(f.spr) - 14, 5, '#ff2a8d'); ctx.restore(); } }
+      if (th.type === 'foe') { const f = TM.FOES[th.foe]; drawSpr(f.spr, 'idle', t + x, x, g, p.x < x ? -1 : 1); if (th.foe !== 'grunt' && th.foe !== 'bernard') { ctx.save(); ctx.globalAlpha = .6 + .4 * Math.sin(t * 6); diamond(x, g - sprTop(f.spr) - 14, 5, '#ff4fd8'); ctx.restore(); } }
       if (th.type === 'cop') { const d = th.cdir; ctx.fillStyle = 'rgba(255,230,140,.16)'; ctx.beginPath(); ctx.moveTo(th.cx, g - 40); ctx.lineTo(th.cx + d * 120, g - 10); ctx.lineTo(th.cx + d * 120, g); ctx.lineTo(th.cx, g); ctx.fill(); drawSpr('cop', th.wait > 0 ? 'idle' : 'walk', t, th.cx, g, d); }
     }
     drawSpr(heroSpr(), p.walking ? 'walk' : 'idle', t, p.x, g, p.dir, { alpha: p.hidden ? .35 : 1 });
-    if (run.hero === 'augie' && TM.S.run.ch === 0) drawSpr('golem', 'idle', t, p.x - p.dir * 26, g, p.dir, {});
+    if (run.hero === 'augie') { golem(p.x - p.dir * 24, g, t, p.walking); golem(p.x - p.dir * 42, g, t + .7, p.walking); }
     // guidance arrow
     for (const tg1 of tg) { const tt = w.things.find((x) => x.key === tg1 || x.id === tg1); if (tt && visible(tt)) { arrowAt(tt.x, g - targetTop(tt) - 18, t); } }
     const door = TM.Game.doorTo(); if (door) arrowAt(door.x, g - 70, t);
@@ -230,25 +237,57 @@ TM.W = (() => {
       ctx.drawImage(lc, 0, 0);
     }
     if (w.sc.tint === 'dawn') { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,170,130,.18)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+    if (w.sc.snow) { for (const f of snow) { f.y += f.s / 60; f.x += Math.sin(w.t * .8 + f.w) * .3 - .25; if (f.y > H) { f.y = -4; f.x = Math.random() * W; } if (f.x < 0) f.x += W; ctx.fillStyle = f.z > 1 ? 'rgba(240,244,255,.95)' : 'rgba(210,220,240,.6)'; ctx.fillRect(f.x | 0, f.y | 0, f.z, f.z); } }
     if (w.sc.rain) { ctx.strokeStyle = 'rgba(170,185,210,.35)'; ctx.beginPath(); for (const r of rain) { r.y += r.s / 60; r.x -= r.s * .2 / 60; if (r.y > H) { r.y = -10; r.x = Math.random() * (W + 40); } ctx.moveTo(r.x, r.y); ctx.lineTo(r.x + 2, r.y - 7); } ctx.stroke(); }
   }
   function diamond(x, y, r, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.fill(); }
   function sparkle(x, y, r, c) { ctx.fillStyle = c; ctx.fillRect(x - .5, y - r, 1.5, r * 2); ctx.fillRect(x - r, y - .5, r * 2, 1.5); ctx.fillRect(x - 1.5, y - 1.5, 3, 3); }
-  function arrowAt(x, y, t) { const b = Math.sin(t * 6) * 3; ctx.fillStyle = '#ff2a8d'; ctx.beginPath(); ctx.moveTo(x - 7, y - 10 + b); ctx.lineTo(x + 7, y - 10 + b); ctx.lineTo(x, y + b); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); }
-  function edgeArrow(d, t) { const x = d < 0 ? 10 : W - 10, y = H / 2, b = Math.sin(t * 6) * 3 * d; ctx.fillStyle = '#ff2a8d'; ctx.beginPath(); ctx.moveTo(x + b, y); ctx.lineTo(x - d * 12 + b, y - 9); ctx.lineTo(x - d * 12 + b, y + 9); ctx.fill(); }
+  function arrowAt(x, y, t) { const b = Math.sin(t * 6) * 3; ctx.fillStyle = '#ff4fd8'; ctx.beginPath(); ctx.moveTo(x - 7, y - 10 + b); ctx.lineTo(x + 7, y - 10 + b); ctx.lineTo(x, y + b); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); }
+  function edgeArrow(d, t) { const x = d < 0 ? 10 : W - 10, y = H / 2, b = Math.sin(t * 6) * 3 * d; ctx.fillStyle = '#ff4fd8'; ctx.beginPath(); ctx.moveTo(x + b, y); ctx.lineTo(x - d * 12 + b, y - 9); ctx.lineTo(x - d * 12 + b, y + 9); ctx.fill(); }
+  function golem(x, g, t, moving) {
+    // Golem I/II (Augie's Kit sheet 14): sealed box on treads, green drone corners, one slit for a face
+    const y = g - 12 + (moving ? Math.round(Math.sin(t * 14)) * .5 : 0);
+    ctx.fillStyle = '#100c14'; ctx.fillRect(x - 8, y - 1, 16, 13); ctx.fillStyle = '#8a8a80'; ctx.fillRect(x - 7, y, 14, 11); ctx.fillStyle = '#a2a298'; ctx.fillRect(x - 7, y, 14, 1);
+    ctx.fillStyle = '#7a8a6a'; ctx.fillRect(x - 7, y, 4, 3); ctx.fillRect(x + 3, y, 4, 3);
+    ctx.fillStyle = '#1a2422'; ctx.fillRect(x - 5, y + 4, 10, 2); ctx.fillStyle = '#5becf1';
+    const blink = (Math.floor(t * 1.3) % 7) === 0; if (!blink) { ctx.fillRect(x - 3, y + 4, 1, 1); ctx.fillRect(x + 2, y + 4, 1, 1); }
+    ctx.fillStyle = '#26262a'; ctx.fillRect(x - 7, y + 11, 14, 1);
+  }
+  const carCache = {};
+  function carSprite(kind) {
+    // original pixel cars, chunky side view: body, cabin, windows, wheels, trim
+    if (carCache[kind]) return carCache[kind];
+    const C = { hatch: ['#c83a34', 30, 1], sedan: ['#3a62c8', 36, 2], wagon: ['#3a9a4a', 40, 3], taxi: ['#f0c020', 36, 2], police: ['#f0f0f0', 38, 2], limo: ['#18181c', 52, 4], c47: ['#2a2a30', 38, 5], cruiser86: ['#e8e8e0', 38, 2], buggy: ['#3a2418', 30, 6] }[kind] || ['#888', 34, 2];
+    const [col, L, shape] = C; const c = document.createElement('canvas'); c.width = L + 6; c.height = 20; const x = c.getContext('2d');
+    const R = (a, b, w, h, k) => { x.fillStyle = k; x.fillRect(a, b, w, h); };
+    const dark = '#0c0a10', glass = '#7aa6c8', glass2 = '#4a6a8a';
+    if (shape === 6) { // 1888 buggy: wooden box, big spoked wheels, folding hood
+      R(4, 7, 22, 6, dark); R(5, 8, 20, 4, col); R(6, 2, 10, 6, dark); R(7, 3, 8, 4, '#1a1410'); R(26, 9, 8, 1, '#5a4030');
+      [[8, 13], [24, 13]].forEach(([cx, cy]) => { x.strokeStyle = dark; x.beginPath(); x.arc(cx, cy, 5, 0, 7); x.stroke(); R(cx - 1, cy - 1, 2, 2, '#8a7050'); });
+      return carCache[kind] = c;
+    }
+    const top = shape === 5 ? 5 : 6;
+    R(1, 9, L + 2, 7, dark); R(2, 10, L, 5, col);                                     // body
+    if (shape === 5) { R(1, 11, 6, 4, dark); R(L - 4, 11, 6, 4, dark); R(2, 12, 4, 2, col); R(L - 3, 12, 4, 2, col); } // 1947 fenders
+    const cab0 = shape === 1 ? 6 : 8, cab1 = shape === 3 ? L - 3 : shape === 4 ? L - 8 : L - 10;
+    R(cab0 - 1, top - 1, cab1 - cab0 + 2, 5, dark); R(cab0, top, cab1 - cab0, 4, col);
+    R(cab0 + 1, top + 1, (cab1 - cab0) / 2 - 1, 3, glass); R(cab0 + (cab1 - cab0) / 2 + 1, top + 1, (cab1 - cab0) / 2 - 2, 3, glass2);
+    if (shape === 4) for (let k = cab0 + 6; k < cab1 - 4; k += 9) R(k, top + 1, 1, 3, dark);
+    R(2, 12, L, 1, 'rgba(255,255,255,.25)'); R(L + 1, 11, 2, 2, '#fff6c0'); R(1, 11, 1, 2, '#c02030');
+    if (kind === 'taxi') { R(L / 2 - 2, top - 3, 5, 2, dark); R(L / 2 - 1, top - 2, 3, 1, '#ffe060'); for (let k = 4; k < L - 2; k += 2) R(k, 13, 1, 1, (k / 2) % 2 ? dark : '#fff'); }
+    if (kind === 'police' || kind === 'cruiser86') { R(2, 12, L, 3, kind === 'police' ? '#16161c' : '#2a3a6a'); R(cab0 + 3, top - 3, 6, 2, dark); R(cab0 + 4, top - 2, 2, 1, '#ff3040'); R(cab0 + 6, top - 2, 2, 1, '#3060ff'); R(L / 2 - 2, 11, 6, 1, '#3060ff'); }
+    [[7, 15], [L - 5, 15]].forEach(([cx, cy]) => { R(cx - 3, cy - 2, 7, 5, dark); R(cx - 2, cy - 1, 5, 3, '#2a2a30'); R(cx - 1, cy, 3, 1, '#8a8a90'); });
+    return carCache[kind] = c;
+  }
   function drawProp(art, x, g, t) {
-    if (art === 'corpse') { ctx.fillStyle = '#cfc8c0'; ctx.fillRect(x - 26, g - 7, 46, 7); ctx.fillStyle = '#d8b8a0'; ctx.fillRect(x + 20, g - 8, 8, 8); ctx.fillStyle = '#3a2a22'; ctx.fillRect(x + 26, g - 9, 4, 9); ctx.fillStyle = `rgba(255,42,141,${.5 + .3 * Math.sin(t * 2)})`; for (let i = 0; i < 5; i++) ctx.fillRect(x - 22 + i * 9, g - 6, 6, 1); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, g - 4, 2.5, 0, 7); ctx.fill(); }
+    if (art.startsWith('car:')) { const c = carSprite(art.slice(4)); ctx.drawImage(c, Math.round(x - c.width / 2), g - c.height + 2); return; }
+    if (art === 'corpse') { ctx.fillStyle = '#cfc8c0'; ctx.fillRect(x - 26, g - 7, 46, 7); ctx.fillStyle = '#d8b8a0'; ctx.fillRect(x + 20, g - 8, 8, 8); ctx.fillStyle = '#3a2a22'; ctx.fillRect(x + 26, g - 9, 4, 9); ctx.fillStyle = `rgba(255,79,216,${.5 + .3 * Math.sin(t * 2)})`; for (let i = 0; i < 5; i++) ctx.fillRect(x - 22 + i * 9, g - 6, 6, 1); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, g - 4, 2.5, 0, 7); ctx.fill(); }
     if (art === 'car' || art === 'wagon') { const c = art === 'wagon' ? '#6a4a2a' : '#3a4a5a'; ctx.fillStyle = '#000'; ctx.fillRect(x - 40, g - 4, 80, 4); ctx.fillStyle = c; ctx.fillRect(x - 40, g - 22, 80, 16); ctx.fillRect(x - 26, g - 34, 50, 13); ctx.fillStyle = '#1a2530'; ctx.fillRect(x - 22, g - 31, 20, 9); ctx.fillRect(x + 2, g - 31, 18, 9); if (art === 'wagon') { ctx.fillStyle = '#8a6a3a'; ctx.fillRect(x - 40, g - 16, 80, 4); } ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x - 24, g - 5, 7, 0, 7); ctx.arc(x + 24, g - 5, 7, 0, 7); ctx.fill(); if (art === 'wagon') { ctx.fillStyle = '#7a3a2a'; ctx.fillRect(x - 31, g - 6, 14, 3); ctx.fillRect(x + 17, g - 6, 14, 3); } }
   }
 
   function init() {
     cv = document.getElementById('game'); ctx = cv.getContext('2d'); lc = document.createElement('canvas'); lx = lc.getContext('2d');
     preload(); window.addEventListener('resize', sizeCanvas); window.addEventListener('orientationchange', () => setTimeout(sizeCanvas, 200));
-    // golem buddy sprite (Augie's box robot) is drawn in code into a tiny sheet
-    const g = document.createElement('canvas'); g.width = 128; g.height = 32; const x = g.getContext('2d');
-    for (let f = 0; f < 4; f++) { const o = f * 32, b = f % 2; x.fillStyle = '#4a5246'; x.fillRect(o + 8, 12 + b, 16, 14); x.fillStyle = '#5d6858'; x.fillRect(o + 8, 12 + b, 16, 2); x.fillStyle = '#0d1512'; x.fillRect(o + 10, 17 + b, 12, 4); x.fillStyle = '#8fe3d0'; x.fillRect(o + 12, 18 + b, 2, 2); x.fillRect(o + 18, 18 + b, 2, 2); x.fillStyle = '#222'; x.fillRect(o + 9, 26, 4, 3); x.fillRect(o + 19, 26, 4, 3); }
-    imgs['assets/sprites/golem.png'] = g; g.complete = true;
-    TM.SPR.golem = { fw: 32, fh: 32, anims: { idle: { r: 0, n: 4, b: [8, 12, 16, 17] }, walk: { r: 0, n: 4, b: [8, 12, 16, 17] } }, scale: 1, face: 'right' };
-  }
-  return { init, enter, update, render, sizeCanvas, drawSpr, burst, shake, visible, get state() { return w; }, get W() { return W; }, get H() { return H; }, chapter, glyphCount };
+    }
+  return { init, enter, update, render, sizeCanvas, drawSpr, burst, shake, visible, sceneMusic, carSprite, get state() { return w; }, get W() { return W; }, get H() { return H; }, chapter, glyphCount };
 })();

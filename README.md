@@ -1,88 +1,38 @@
-# TECHNOMANCERS
+# CHRONOMANCER
 
-**A Raincaster Mystery · Maryland, 1996**
+**A Raincaster Mystery · 1888 · 1947 · 1986 · 2026**
 
-A waitress is found dead in an abandoned mansion. There are glowing shapes on her skin and a perfectly round hole through her body. Play as **Augie**, an engineer who escaped a cult of technomancers, or **Jester**, an undercover cop deep inside the Mantis gang. Work out who killed Lena Marsh, and what came out of the aunt's basement.
+November 2026. A girl is found dead in the Hartwell mansion, still warm, with a perfectly round hole through her and a watch stopped at 3:07. She went missing in **1986**. She's still sixteen.
 
-A side-scrolling pixel mystery in the style of Step Quest. It's built to be easy to pick up: one button, one goal on screen at a time, and a pink arrow that always shows you where to go.
+Play as **Augie**, an engineer who escaped a cult of technomancers (staff with swappable heads, two box-droids), or **Jester**, an undercover cop inside the Mantis crew (fists, shotgun, the crew, and the mask). With **Mina**, a runaway 13-year-old Chronomancer, you follow a killer back through Raincaster's history: Halloween 1986, a jazz club in 1947, and the Great Blizzard of 1888.
 
 It's an installable **PWA** that works offline on phones and computers.
 
----
+## The rules of time
+1. **TETHER:** Mina can only open a door to a moment she's holding a piece of.
+2. **FIXED:** the past already happened, and if you go there, you were always part of it.
+3. **ANCHOR:** someone stays in the present holding the tether, so only one hero travels.
+4. **DAWN:** the door closes at sunrise.
 
 ## How to play
-
-- **Walk** with ◀ ▶ (or A/D or the arrow keys). Press **ACTION** (Space/E) to look, talk, solve or go.
-- **Follow the pink arrow.** The box at the top-left always tells you the one thing to do next.
-- **Clues** sparkle ✦. Everything you find goes in your 📁 **Case File**.
-- **Case questions:** when you have the clues, the game asks what they mean. Choose from 3 answers; a wrong answer gives you a hint.
-- **"THAT'S A LIE!":** when someone lies, call it out and pick the clue that proves it.
-- **Ask anyone anything:** after someone's first conversation, TALK to them again to type your own questions.
-- **Puzzles and memory games:** tune a radio, fix a torn page, remember a crime scene, crack a keypad, match evidence tags, open a safe, restore power, and find the fake brick. Each one has a 💡 HINT.
-- **Fights:** turn-based. The enemy always shows its **NEXT MOVE** and what it's **WEAK TO**. Use that gadget to cancel its move and hit hard.
-- **Jester is undercover.** His **COVER** meter drops if he talks like a cop around the Mantis gang. If it empties, the gang attacks.
-
-### What keeps you coming back
-XP and 7 detective ranks (each one adds max health), 3 stars per chapter, 21 trophies, hidden ◆ glyphs that unlock character files, a **Daily Case** with a streak, and two playable sides of the same story.
-
----
+- **Walk** with ◀ ▶ (A/D or the arrow keys). Press **ACTION** (Space/E) to look, talk, solve or go. The objective box and the arrow always show the next step.
+- **Clues, case questions, lie-catching:** find clues, answer what they mean, and call out lies with the clue that proves them.
+- **History checks:** in the past, people test you. Say something from the future and your **BLEND** meter drops. If it empties, the law comes for you. (Jester's **COVER** works the same way with the crew in 2026.)
+- **Knowledge checks** on real forensics, plus **12 puzzle types**: radio tuning, scene memory, putting photos in date order, memory pairs, the killer's seven-note chime, a decoder ring, setting clock hands, locks, gears, a hidden panel, and a torn drawing.
+- **Real-time fights:** move, combo, dodge-roll through wind-ups. Red wind-ups are heavy hits, and some wind-ups are fakes. Keys: J/Space attack, K/Shift dodge, U I O kit, H heal.
+  - **Augie:** swap staff heads live (Knocker, Stun Crown, Mower Blade, Thunderclap), drum rounds (taser, flare, ash), Golem I battle mode and Golem II fortress.
+  - **Jester:** jab-jab-uppercut, pump shotgun, crew rush, and **the mask** (a berserk flurry).
+- **Raincaster Run:** a side-scrolling car chase in chapter 5, also playable endlessly from the title screen.
+- **Ask anyone anything:** talk to someone a second time to type your own questions. They can be AI-driven through the optional proxy in `server/`.
 
 ## Run it
-
 ```bash
-python3 -m http.server 8000      # then open http://localhost:8000
+python3 -m http.server 8000      # open http://localhost:8000
 ```
+GitHub Pages: upload everything (including `.github/` and `.nojekyll`), then set **Settings → Pages → Source: GitHub Actions**.
 
-## Put it on GitHub Pages
-
-1. Create a repository and upload **everything** in this folder, including `.github/` and `.nojekyll`.
-2. **Settings → Pages → Source: GitHub Actions.** The included workflow publishes on every push to `main`.
-3. Open `https://<you>.github.io/<repo>/`. On a phone, use **Add to Home Screen**.
-4. When you update the game, bump `VERSION` in `sw.js` so installed copies refresh.
-
-## Make the characters truly smart (optional)
-
-Without setup, the characters answer free-typed questions with built-in replies that match each topic. To have them answer **anything** intelligently, they can be played by Claude:
-
-1. Get an API key at <https://console.anthropic.com>.
-2. Deploy the tiny proxy in `server/` (a free Cloudflare Worker), which keeps your key secret:
-   ```bash
-   npm i -g wrangler && wrangler login
-   cd server
-   wrangler secret put ANTHROPIC_API_KEY
-   wrangler deploy
-   ```
-3. Paste the worker URL into `js/config.js` (`aiEndpoint`), or into **Settings → AI characters server** in the game.
-4. Recommended: in `server/wrangler.toml`, set `ALLOWED_ORIGINS` to your GitHub Pages address so only your game can use it.
-
-Each character has a written personality, what they know, and what they hide. They stay in character, won't reveal secrets just because you ask, and nudge lost players toward the next step. With Jester, the AI also decides when he has said something a cop would say. You pay Anthropic for usage; the worker uses a small, inexpensive model.
-
----
-
-## Project layout
-
-```
-index.html, manifest.webmanifest, sw.js, css/style.css
-js/00-util.js        helpers + Web Audio (synth music, real sound effects)
-js/config.js         AI server address
-js/01-sprites.js     sprite sheet metadata (generated)
-js/01-bg.js          background layer metadata
-js/02-story.js       chapters, scenes, clues, questions, lies, fights, dialogue, trophies, Daily Case
-js/03-state.js       saves (localStorage): profile + current game
-js/05-world.js       side-view scenes, walking, guidance arrow, stealth guards
-js/06-battle.js      turn-based fights, Bernard's 3 phases
-js/06b-puzzles.js    puzzles and memory games
-js/06c-talk.js       "ask anything" conversations (AI + offline)
-js/07-ui.js          dialogue, clue cards, questions, menus, Daily Case, results
-js/08-main.js        objectives, stars, cover system, boot
-assets/              sprites, backgrounds, fonts, sound effects
-server/              Cloudflare Worker proxy for AI characters
-tools/               sprite builder (recolors + costumes Step Quest bases into the cast)
-```
-
-To rebuild the character sprites after editing `tools/build_sprites.py`, `tools/costume.py` or `tools/bernard.py`:
+## Rebuild the art
 ```bash
-python3 tools/build_sprites.py <path-to-Step-Quest> assets/sprites
+python3 tools/build_all.py <folder with the base-template GIFs/PNGs> <Step-Quest folder>   # characters + Bernard
+python3 tools/bgpaint.py assets/bg                                                         # rural-noir / neo-noir backgrounds
 ```
-
-See **CREDITS.md** for asset licenses.

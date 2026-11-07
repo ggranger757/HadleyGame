@@ -1,5 +1,5 @@
 /* =========================================================================
-   TECHNOMANCERS — 07-ui.js
+   CHRONOMANCER — 07-ui.js
    Everything on top of the canvas: HUD, dialogue (portraits, choices,
    "THAT'S A LIE!"), clue cards, case questions, menus, Case File, Daily Case,
    chapter results, ending. Big buttons, plain words.
@@ -7,8 +7,10 @@
 'use strict';
 TM.UI = (() => {
   const U = TM.U, $ = (s) => document.querySelector(s);
-  const UI = {}; let modal = false, screen = false, dlg = null, battleOn = false;
-  UI.blocking = () => modal || screen || !!dlg || battleOn;
+  const UI = {}; let modal = false, screen = false, dlg = null, battleOn = false, chaseOn = false;
+  UI.blocking = () => modal || screen || !!dlg || battleOn || chaseOn;
+  UI.modalOpen = () => modal;
+  UI.chaseOn = (on) => { chaseOn = on; document.body.classList.toggle('chasing', on); };
 
   /* ---------------- layers ---------------- */
   UI.modal = (html, cls = '') => { const m = $('#modal'); m.className = 'modal on ' + cls; m.innerHTML = `<div class="panel">${html}</div>`; modal = true; return m; };
@@ -20,6 +22,11 @@ TM.UI = (() => {
   UI.xp = (n, why) => { const d = document.createElement('div'); d.className = 'xpp'; d.textContent = `+${n} XP${why ? ' · ' + why : ''}`; $('#xpfeed').appendChild(d); setTimeout(() => d.remove(), 1700); };
   UI.rankUp = (r) => { TM.Audio.play('rank'); UI.banner('RANK UP: ' + r.name); UI.toast('You ranked up! +10 max health.'); };
   UI.feat = (f) => { TM.Audio.play('win'); UI.toast(`🏆 *${f[0]}* — ${f[1]}`); };
+  UI.timejump = (from, to, cb) => {
+    const f = $('#tj'); const a = +from || 2026, b = +to || 2026; f.className = 'tj on'; f.innerHTML = `<div class="tjclock"><i></i><b></b></div><div class="tjyear">${a}</div><div class="tjsub">${b < a ? 'BACK' : 'FORWARD'} THROUGH THE HOUR</div>`;
+    TM.Audio.play('portal'); TM.Audio.play('tear'); const y = f.querySelector('.tjyear'); let k = 0; const n = 38;
+    const iv = setInterval(() => { k++; const e = k / n; const v = Math.round(a + (b - a) * (1 - Math.pow(1 - e, 3))); y.textContent = v; if (k % 3 === 0) TM.Audio.play('blip'); if (k >= n) { clearInterval(iv); y.textContent = b; TM.Audio.play('clue'); setTimeout(() => { f.className = 'tj'; f.innerHTML = ''; cb && cb(); }, 900); } }, 45);
+  };
   UI.fade = (cb) => { const f = $('#fade'); f.classList.add('on'); setTimeout(() => { cb(); f.classList.remove('on'); }, 260); };
   UI.notice = (title, text, cb) => {
     const m = UI.modal(`<div class="notice"><h2>${U.esc(title)}</h2><p>${U.fmt(text)}</p><button class="btn big" data-ok>GOT IT</button></div>`);
@@ -31,11 +38,13 @@ TM.UI = (() => {
   /* ---------------- HUD ---------------- */
   UI.hud = () => {
     const run = TM.S.run; if (!run) return; const ch = TM.CHAPTERS[run.ch]; const st = TM.Game.step();
-    $('#chap').textContent = `CH ${ch.n} · ${ch.title}`;
+    $('#chap').textContent = `${ch.era} · CH ${ch.n} · ${ch.title}`;
     $('#obj').innerHTML = st ? `<span>▶</span> ${U.esc(TM.Game.text(st.text))} ${TM.Game.progress(st)}` : '<span>✓</span> Chapter complete';
     $('#obj').classList.toggle('solve', !!(st && st.need.q));
     $('#hp i').style.width = (run.hp / run.maxHp * 100) + '%'; $('#hp b').textContent = Math.ceil(run.hp);
-    const cv = $('#cover'); if (run.hero === 'jester') { cv.hidden = false; cv.innerHTML = 'COVER ' + [0, 1, 2].map((i) => `<i class="${i < run.cover ? 'on' : ''}"></i>`).join(''); } else cv.hidden = true;
+    const cv = $('#cover'); const past = ch.era !== '2026';
+    if (past) { cv.hidden = false; cv.className = 'cover blend'; cv.innerHTML = 'BLEND ' + [0, 1, 2].map((i) => `<i class="${i < (run.blend == null ? 3 : run.blend) ? 'on' : ''}"></i>`).join(''); }
+    else if (run.hero === 'jester') { cv.hidden = false; cv.className = 'cover'; cv.innerHTML = 'COVER ' + [0, 1, 2].map((i) => `<i class="${i < run.cover ? 'on' : ''}"></i>`).join(''); } else cv.hidden = true;
     $('#glyphs').textContent = '◆ ' + TM.W.glyphCount();
   };
 
@@ -63,8 +72,8 @@ TM.UI = (() => {
       else if (k === 'flag') run.flags[v] = true;
       else if (k === 'xp') TM.S.xp(+v, 'nice');
       else if (k === 'ach') TM.S.feat(v);
-      else if (k === 'gadget') { if (run.hero === 'augie') run.gadgets.ash = (run.gadgets.ash || 0) + 1; else run.gadgets.emp = (run.gadgets.emp || 0) + 2; }
       else if (k === 'cover') TM.Game.cover(+v);
+      else if (k === 'blend') TM.Game.blend(+v);
     }
   }
   function next(i) {
@@ -144,13 +153,14 @@ TM.UI = (() => {
   UI.clue = (id, silent) => {
     const run = TM.S.run, C = TM.CLUES[id]; if (!C) return; const isNew = !run.clues.includes(id);
     if (isNew) { run.clues.push(id); TM.Audio.play('clue'); TM.S.xp(15, 'clue'); TM.S.feat('first_clue'); TM.Game.onClue(id); TM.S.saveRun(); }
-    const extra = C.extra && run.hero === 'augie' ? `<div class="extra">🔍 AUGIE NOTICES: ${U.esc(C.extra)}</div>` : '';
+    const extra = C.extra && run.hero === 'augie' ? `<div class="extra">🤖 GOLEM SCAN: ${U.esc(C.extra)}</div>` : '';
     const m = UI.modal(`<div class="kicker">${isNew ? 'NEW CLUE' : 'CLUE'}</div><div class="bigicon">${C.i}</div><h2>${U.esc(C.t)}</h2><p class="cdesc">${U.fmt(C.d)}</p>${extra}<button class="btn big" data-ok>GOT IT</button>`, 'cluem');
     m.querySelector('[data-ok]').onclick = () => { UI.close(); TM.Game.checkSteps(); };
   };
   UI.question = (qid) => {
     const Q = TM.QUESTIONS[qid]; const opts = Q.a.map((a, i) => ({ ...a, i })).sort(() => Math.random() - .5);
-    const m = UI.modal(`<div class="kicker">🕵 CASE QUESTION</div><h2>${U.esc(Q.q)}</h2><div class="answers">${opts.map((o) => `<button class="abtn" data-i="${o.i}">${U.esc(o.t)}</button>`).join('')}</div><div class="qhint" id="qhint"></div><button class="btn ghost" data-file>📁 READ MY CLUES FIRST</button>`, 'q');
+    const kick = Q.kind === 'history' ? `🕰 HISTORY CHECK · ${Q.era}` : Q.kind === 'know' ? '🔬 KNOWLEDGE CHECK' : '🕵 CASE QUESTION';
+    const m = UI.modal(`<div class="kicker">${kick}</div><h2>${U.esc(Q.q)}</h2><div class="answers">${opts.map((o) => `<button class="abtn" data-i="${o.i}">${U.esc(o.t)}</button>`).join('')}</div><div class="qhint" id="qhint"></div><button class="btn ghost" data-file>📁 READ MY CLUES FIRST</button>`, 'q');
     m.querySelectorAll('[data-i]').forEach((b) => b.onclick = () => {
       const a = Q.a[+b.dataset.i];
       if (a.ok) {
@@ -166,7 +176,7 @@ TM.UI = (() => {
   UI.caseFile = (back) => {
     const run = TM.S.run; let tab = 'clues';
     const render = () => {
-      const files = Object.entries(TM.FILES).filter(([k]) => TM.S.profile.files[k] || ['augie', 'jester', 'tmancers'].includes(k));
+      const files = Object.entries(TM.FILES).filter(([k]) => TM.S.profile.files[k] || ['augie', 'jester', 'rules', 'zyxth'].includes(k));
       const m = UI.modal(`<div class="tabs"><button class="${tab === 'clues' ? 'on' : ''}" data-t="clues">CLUES (${run.clues.length})</button><button class="${tab === 'files' ? 'on' : ''}" data-t="files">FILES</button></div>
         ${tab === 'clues' ? `<div class="cards">${run.clues.slice().reverse().map((c) => clueCard(c)).join('') || '<p class="dim">No clues yet. Look for the sparkles ✦.</p>'}</div>` :
           `<div class="files">${files.map(([k, f]) => `<details><summary>${U.esc(f[0])}</summary><p>${U.esc(f[1])}</p></details>`).join('')}<p class="dim">Find hidden ◆ glyphs to unlock more files.</p></div>`}
@@ -180,15 +190,16 @@ TM.UI = (() => {
   /* ---------------- menus ---------------- */
   function rankBox() { const r = TM.S.rank(), p = TM.S.profile; return `<div class="rank"><small>DETECTIVE RANK</small><b>${r.name}</b><div class="bar"><i style="width:${r.next ? (p.xp - r.cur) / (r.next - r.cur) * 100 : 100}%"></i></div><small>${p.xp} XP${r.next ? ' · ' + (r.next - p.xp) + ' to ' + r.nextName : ''}</small></div>`; }
   UI.title = () => {
-    TM.Main.state = 'title'; UI.battle(false); TM.Audio.setMood('calm');
+    TM.Main.state = 'title'; UI.battle(false); TM.Audio.setMood('title'); document.body.dataset.era = 'title';
     const p = TM.S.profile, has = TM.S.hasRun(), today = U.todayKey(), dj = p.daily;
-    const s = UI.screen(`<div class="title"><div class="logo"><div class="eye"></div><h1>TECHNOMANCERS</h1><div class="sub">A RAINCASTER MYSTERY · 1996</div></div>
+    const s = UI.screen(`<div class="title"><div class="logo"><div class="eye"></div><h1>CHRONOMANCER</h1><div class="sub">A RAINCASTER MYSTERY · 1888 · 1947 · 1986 · 2026</div></div>
       <div class="menu">${has ? '<button class="btn big" data-g="cont">CONTINUE</button>' : ''}<button class="btn ${has ? 'ghost' : 'big'}" data-g="new">NEW GAME</button>
+      <button class="btn ghost" data-g="run">🚗 RAINCASTER RUN ${p.chaseBest ? '· BEST ' + p.chaseBest + ' m' : ''}</button>
       <button class="btn ghost ${dj.last === today ? '' : 'pulse'}" data-g="daily">🕵 DAILY CASE ${dj.streak ? '🔥' + dj.streak : ''} ${dj.last === today ? '✓' : ''}</button>
       <div class="row"><button class="btn ghost" data-g="feats">🏆 ${Object.keys(p.feats).length}/${Object.keys(TM.FEATS).length}</button><button class="btn ghost" data-g="files">📁 FILES</button><button class="btn ghost" data-g="set">⚙</button></div></div>${rankBox()}
       ${UI.installable ? '<button class="btn ghost" data-g="install">📲 INSTALL THE APP</button>' : ''}</div>`, 'tscreen');
     s.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { TM.Audio.init(); TM.Audio.play('ui'); const g = b.dataset.g;
-      if (g === 'cont') TM.Main.cont(); if (g === 'new') UI.heroSelect(); if (g === 'daily') UI.daily(); if (g === 'feats') UI.feats(); if (g === 'files') UI.files(); if (g === 'set') UI.settings(UI.title); if (g === 'install') UI.install(); });
+      if (g === 'run') { UI.closeScreen(); TM.Chase.start('arcade'); } if (g === 'cont') TM.Main.cont(); if (g === 'new') UI.heroSelect(); if (g === 'daily') UI.daily(); if (g === 'feats') UI.feats(); if (g === 'files') UI.files(); if (g === 'set') UI.settings(UI.title); if (g === 'install') UI.install(); });
   };
   UI.heroSelect = () => {
     const card = (k) => { const H = TM.HEROES[k]; const done = TM.S.profile.done[k]; return `<button class="hero" data-h="${k}"><canvas data-spr="${k}" width="80" height="120"></canvas><div><h2>${H.name}</h2><div class="tag">${H.tag}</div><p>${U.esc(H.blurb)}</p><ul>${H.perks.map((x) => `<li>${x}</li>`).join('')}</ul>${done ? '<div class="done">★ CASE CLOSED</div>' : ''}</div></button>`; };
@@ -219,7 +230,7 @@ TM.UI = (() => {
     s.querySelector('[data-b]').onclick = back;
   };
   UI.feats = () => { const p = TM.S.profile; const s = UI.screen(`<div class="list"><h2 class="st">TROPHIES</h2>${Object.entries(TM.FEATS).map(([k, f]) => `<div class="feat ${p.feats[k] ? 'got' : ''}"><b>${p.feats[k] ? '🏆' : '🔒'} ${U.esc(f[0])}</b><small>${U.esc(f[1])}</small><em>+${f[2]} XP</em></div>`).join('')}<button class="btn big" data-b>BACK</button></div>`); s.querySelector('[data-b]').onclick = UI.title; };
-  UI.files = () => { const p = TM.S.profile; const s = UI.screen(`<div class="list"><h2 class="st">FILES</h2>${Object.entries(TM.FILES).map(([k, f]) => p.files[k] || ['augie', 'jester', 'tmancers'].includes(k) ? `<details><summary>${U.esc(f[0])}</summary><p>${U.esc(f[1])}</p></details>` : '<div class="locked">🔒 Find hidden ◆ glyphs to unlock</div>').join('')}<button class="btn big" data-b>BACK</button></div>`); s.querySelector('[data-b]').onclick = UI.title; };
+  UI.files = () => { const p = TM.S.profile; const s = UI.screen(`<div class="list"><h2 class="st">FILES</h2>${Object.entries(TM.FILES).map(([k, f]) => p.files[k] || ['augie', 'jester', 'rules', 'zyxth'].includes(k) ? `<details><summary>${U.esc(f[0])}</summary><p>${U.esc(f[1])}</p></details>` : '<div class="locked">🔒 Find hidden ◆ glyphs to unlock</div>').join('')}<button class="btn big" data-b>BACK</button></div>`); s.querySelector('[data-b]').onclick = UI.title; };
 
   /* ---------------- chapter results & ending ---------------- */
   UI.results = (ch, stars, why, cb) => {
@@ -231,10 +242,10 @@ TM.UI = (() => {
   UI.ending = () => {
     const run = TM.S.run, p = TM.S.profile, other = run.hero === 'augie' ? 'jester' : 'augie';
     const total = TM.CHAPTERS.reduce((a, c) => a + (p.stars[run.hero + ':' + c.id] || 0), 0);
-    const s = UI.screen(`<div class="ending"><div class="kicker">TECHNOMANCERS · CASE 01</div><h2 class="st">CASE CLOSED</h2><p>${run.flags.destroyed ? 'You destroyed it. Probably.' : 'You trapped it. For one second.'}</p>
+    const s = UI.screen(`<div class="ending"><div class="kicker">CHRONOMANCER · CASE 01</div><h2 class="st">CASE CLOSED</h2><p>${run.flags.home ? 'You brought Bernard home. Something very tall is hiding in Raincaster.' : 'You let him rest. Nothing knocks anymore.'}</p>
       <div class="stats"><div><b>${run.clues.length}</b><small>clues</small></div><div><b>${Object.keys(run.solved).length}</b><small>questions solved</small></div><div><b>${total}/${TM.CHAPTERS.length * 3}</b><small>stars</small></div></div>${rankBox()}
-      <div class="tease"><b>CASE 02 · THE SCIENTIST</b><p>Dead. Captured. Escaped. Became something else. Coming soon.</p></div>
-      ${!p.done[other] ? `<p class="mag">Now play as ${TM.HEROES[other].name}. Same night, different side of the story.</p><button class="btn big" data-o>PLAY AS ${TM.HEROES[other].name}</button>` : ''}<button class="btn ghost" data-t>TITLE</button></div>`);
+      <div class="tease"><b>CASE 02</b><p>A watch in the rubble, stopped at 3:07. Coming soon.</p></div>
+      ${!p.done[other] ? `<p class="mag">Now play as ${TM.HEROES[other].name}. Same nights, a different way through them.</p><button class="btn big" data-o>PLAY AS ${TM.HEROES[other].name}</button>` : ''}<button class="btn ghost" data-t>TITLE</button></div>`);
     const o = s.querySelector('[data-o]'); if (o) o.onclick = () => TM.Main.newGame(other); s.querySelector('[data-t]').onclick = UI.title;
   };
 
