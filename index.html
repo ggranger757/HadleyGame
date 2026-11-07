@@ -4,70 +4,51 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>Technomancers</title>
-  <meta name="description" content="Technomancers — a 2D pixel mystery sci-fi horror adventure. Raincaster, Maryland, 1996.">
-  <meta name="theme-color" content="#050608">
+  <meta name="description" content="Technomancers — a pixel-art mystery. Raincaster, Maryland, 1996.">
+  <meta name="theme-color" content="#0b0b12">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Technomancers">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="stage"><canvas id="game" width="480" height="270" aria-label="Game view"></canvas><div class="scan"></div></div>
-
-  <!-- HUD -->
+  <div id="stage"><canvas id="game"></canvas></div>
   <div id="hud">
-    <div id="obj" class="obj"></div>
-    <div class="vitals">
-      <div id="hp" class="meter hp"><span>HP</span><div class="bar"><i></i></div><b></b></div>
-      <div id="nerve" class="meter nerve"><span>NERVE</span><div class="bar"><i></i></div></div>
-      <div id="susp" class="meter susp"><span>◉</span><div class="bar"><i></i></div><b></b></div>
-      <div class="ledrow"><span>ANCHOR</span><i id="led" class="led"></i><em id="chain"></em></div>
+    <div class="hudtop">
+      <div class="left"><div id="chap"></div><div id="obj"></div></div>
+      <div class="right">
+        <div id="hp" class="hp"><span>♥</span><div class="bar"><i></i></div><b></b></div>
+        <div id="cover" class="cover" hidden></div>
+        <div id="glyphs" class="glyphs"></div>
+        <div class="hbtns"><button data-ui="file" aria-label="Case file">📁</button><button data-ui="menu" aria-label="Menu">☰</button></div>
+      </div>
     </div>
-    <div id="rank" class="rank"></div>
-    <div class="loadout"><div id="weap" class="slot"></div><div id="kit" class="slot"></div><div id="scrap" class="scrap"></div></div>
-    <div class="topbtns"><button data-ui="board" aria-label="Evidence board">⚑</button><button data-ui="pause" aria-label="Pause">❚❚</button></div>
+    <div id="acthint" class="acthint"></div>
   </div>
-  <div id="bossbar" class="bossbar"></div>
-  <div id="xpfeed"></div>
-  <div id="toasts"></div>
-  <div id="banner" class="banner"></div>
-
-  <!-- touch controls -->
-  <div id="touch">
-    <div class="stick"><div class="nub"></div></div>
-    <div class="tbtns">
-      <button data-act="attack" id="tbtn-atk" class="tb big" aria-label="Attack"></button>
-      <button data-act="interact" class="tb big act" aria-label="Interact">◉</button>
-      <button data-act="kit" id="tbtn-kit" class="tb" aria-label="Use kit"></button>
-      <button data-act="cycle" class="tb sm" aria-label="Cycle kit">⟳</button>
-      <button data-act="swap" class="tb sm" aria-label="Swap head">⇄</button>
-      <button data-act="anchor" class="tb sm" aria-label="Reality anchor">⌖</button>
-      <button data-act="detective" id="tbtn-det" class="tb sm" aria-label="Detective mode">◎</button>
-      <button data-act="light" id="tbtn-light" class="tb sm" aria-label="Flashlight">☼</button>
-    </div>
+  <div id="controls">
+    <div class="dpad"><button data-hold="left" aria-label="Walk left">◀</button><button data-hold="right" aria-label="Walk right">▶</button></div>
+    <button id="act" class="act" data-tap="act" aria-label="Action">·</button>
   </div>
-
+  <div id="battle" class="battle"></div>
   <div id="dialog" class="dialog"></div>
   <div id="modal" class="modal"></div>
   <div id="screen" class="screen"></div>
-  <noscript><p style="color:#fff;padding:2em">Technomancers needs JavaScript.</p></noscript>
-
+  <div id="toasts"></div><div id="banner" class="banner"></div><div id="xpfeed"></div><div id="fade"></div>
   <script src="js/00-util.js"></script>
-  <script src="js/01-data.js"></script>
-  <script src="js/01b-story.js"></script>
-  <script src="js/01c-levels.js"></script>
-  <script src="js/02-state.js"></script>
-  <script src="js/03-input.js"></script>
-  <script src="js/04-engine.js"></script>
-  <script src="js/05-render.js"></script>
-  <script src="js/06-player.js"></script>
-  <script src="js/07-ai.js"></script>
-  <script src="js/08-forensics.js"></script>
-  <script src="js/09-ui.js"></script>
-  <script src="js/10-main.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/01-sprites.js"></script>
+  <script src="js/01-bg.js"></script>
+  <script src="js/02-story.js"></script>
+  <script src="js/03-state.js"></script>
+  <script src="js/05-world.js"></script>
+  <script src="js/06-battle.js"></script>
+  <script src="js/06b-puzzles.js"></script>
+  <script src="js/06c-talk.js"></script>
+  <script src="js/07-ui.js"></script>
+  <script src="js/08-main.js"></script>
 </body>
 </html>

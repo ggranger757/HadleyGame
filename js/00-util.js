@@ -21,7 +21,7 @@ TM.U = {
   esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); },
   // *word* → magenta emphasis, _word_ → red (reserved: tears/danger)
   fmt(s) { return TM.U.esc(s).replace(/\*(.+?)\*/g, '<em>$1</em>').replace(/_(.+?)_/g, '<b class="red">$1</b>').replace(/\n/g, '<br>'); },
-  vibrate(ms) { try { if (TM.S && TM.S.profile.settings.haptics && navigator.vibrate) navigator.vibrate(ms); } catch (e) { } },
+  vibrate(ms) { try { if (TM.S && TM.S.profile && TM.S.profile.settings.haptics && navigator.vibrate) navigator.vibrate(ms); } catch (e) { } },
 };
 
 /* -------------------------------------------------------------------------
@@ -48,12 +48,12 @@ TM.Audio = (() => {
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500;
     rainGain = ctx.createGain(); rainGain.gain.value = 0;
     rn.connect(bp); bp.connect(hp); hp.connect(rainGain); rainGain.connect(master); rn.start();
-    buildLayers();
+    buildLayers(); loadFiles();
     applyVolume();
     setMood(mood === 'off' ? 'calm' : mood, true);
   }
   function applyVolume() {
-    if (!ctx) return; const st = TM.S ? TM.S.profile.settings : { sound: true, music: .7, sfx: .8 };
+    if (!ctx) return; const st = (TM.S && TM.S.profile) ? TM.S.profile.settings : { sound: true, music: .7, sfx: .8 };
     master.gain.value = st.sound ? 1 : 0; musicBus.gain.value = st.music * .55; sfxBus.gain.value = st.sfx;
   }
   function osc(type, f, g, dest, detune = 0) { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = detune; const gn = ctx.createGain(); gn.gain.value = g; o.connect(gn); gn.connect(dest); o.start(); return { o, g: gn }; }
@@ -138,7 +138,12 @@ TM.Audio = (() => {
     ach() { [784, 988, 1175, 1568].forEach((f, i) => tone('square', f, .12, .06, null, i * .07)); },
   };
   A.init = init; A.setMood = setMood; A.setRain = setRain; A.applyVolume = applyVolume; A.sfx = sfx;
-  A.play = (name, ...a) => { try { if (ctx && sfx[name]) sfx[name](...a); } catch (e) { } };
+  // real sound effects (from Step Quest) with synth fallback
+  const FILES = { hit: 'hit_mace', knife: 'hit_knife', staff: 'hit_staff', clue: 'discovery', rank: 'level_up', win: 'quest_complete', lose: 'battle_loss', block: 'shield_block', heal: 'potion', stun: 'status_stun', void: 'spell_void', cast: 'spell_cast', spark: 'spark', nova: 'special_nova', flame: 'blue_flame', zap: 'en_zap', portal: 'dm_void', mirror: 'mirror_attack', monster: 'creature_attack_2', ui2: 'equip', coin: 'buy' };
+  const bufs = {};
+  function loadFiles() { for (const k in FILES) fetch('assets/sfx/' + FILES[k] + '.mp3').then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(d => { bufs[k] = d; }).catch(() => { }); }
+  A.file = (k, vol = .7) => { if (!ctx || !bufs[k]) return false; const s = ctx.createBufferSource(); s.buffer = bufs[k]; const g = ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(sfxBus); s.start(); return true; };
+  A.play = (name, ...a) => { try { if (A.file(name)) return; if (ctx && sfx[name]) sfx[name](...a); } catch (e) { } };
   A.tick = (dt, nerve, outdoors) => {
     if (!ctx) return;
     if (nerve < 35) { hbTimer -= dt; if (hbTimer <= 0) { sfx.heartbeat(); hbTimer = TM.U.lerp(.55, 1.1, nerve / 35); } }
